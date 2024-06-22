@@ -1,8 +1,9 @@
 'use client';
 import React, { useState, ChangeEvent } from 'react';
-import * as XLSX from 'xlsx';
 import ical, { ICalEventRepeatingFreq, ICalWeekday } from 'ical-generator';
 import { saveAs } from 'file-saver';
+import Excel from 'exceljs'
+
 
 const FileUpload: React.FC = () => {
     const [file, setFile] = useState<File | null>(null);
@@ -14,22 +15,28 @@ const FileUpload: React.FC = () => {
         }
     };
 
-    const handleFileUpload = () => {
+    const handleFileUpload = async () => {
         if (!file) return;
-
+        console.log("HELLO");
+        const workbook = new Excel.Workbook();
         const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                if (!e.target?.result) return;
-                const data = new Uint8Array(e.target.result as ArrayBuffer);
-                const workbook = XLSX.read(data, { type: 'array' });
-                const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                const json: any[] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-                const calendar = ical({ name: 'Schedule' });
-                json.slice(3).forEach(row => {
-                    const schedule: string = row[7];
-                    const section: string = row[4];
+        reader.readAsArrayBuffer(file);
+        reader.onload = async (e) => {
+            const buffer = e.target?.result as ArrayBuffer;
+            await workbook.xlsx.load(buffer);
+
+            const worksheet = workbook.worksheets[0];
+            console.log(worksheet);
+            const rows = worksheet.getSheetValues().slice(4);  // Skip headers and start from the fourth row
+            const calendar = ical({ name: 'Schedule' });
+            console.log(rows);
+            try {
+                rows.forEach((row: any) => {
+                    if (!row || row.length < 1) return;
+                    const section: string = row[5];
+                    const schedule: string = row[8];
+                    console.log(schedule, section);
                     const [dateRange, days, timeRange, location] = schedule.split(' | ');
                     const [startDate, endDate] = dateRange.split(' - ');
                     const [startTime, endTime] = timeRange.split(' - ');
@@ -58,6 +65,7 @@ const FileUpload: React.FC = () => {
                     const eventDays = days.split(' ').map(day => daysOfWeek[day]);
                     const eventTitle = section.split(' - ')[0];
 
+                    console.log(eventStart, eventEnd, eventDays, location, eventTitle);
                     calendar.createEvent({
                         start: eventStart,
                         end: eventEnd,
@@ -76,13 +84,9 @@ const FileUpload: React.FC = () => {
                 setDone(true);
             } catch (e) {
                 alert('Sorry! Failed to convert file. Please verify the content of the file.');
+                console.error(e);
             }
         };
-        try {
-            reader.readAsArrayBuffer(file);
-        } catch (e) {
-            alert('Sorry! Failed to read file. Please refresh the page and try again.');
-        }
     };
 
     return (
