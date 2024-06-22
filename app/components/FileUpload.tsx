@@ -19,63 +19,70 @@ const FileUpload: React.FC = () => {
 
         const reader = new FileReader();
         reader.onload = (e) => {
-            if (!e.target?.result) return;
-            const data = new Uint8Array(e.target.result as ArrayBuffer);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            const json: any[] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            try {
+                if (!e.target?.result) return;
+                const data = new Uint8Array(e.target.result as ArrayBuffer);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const json: any[] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-            const calendar = ical({ name: 'Schedule' });
-            json.slice(3).forEach(row => {
-                const schedule: string = row[7];
-                const section: string = row[4];
-                const [dateRange, days, timeRange, location] = schedule.split(' | ');
-                const [startDate, endDate] = dateRange.split(' - ');
-                const [startTime, endTime] = timeRange.split(' - ');
+                const calendar = ical({ name: 'Schedule' });
+                json.slice(3).forEach(row => {
+                    const schedule: string = row[7];
+                    const section: string = row[4];
+                    const [dateRange, days, timeRange, location] = schedule.split(' | ');
+                    const [startDate, endDate] = dateRange.split(' - ');
+                    const [startTime, endTime] = timeRange.split(' - ');
 
-                const daysOfWeek: { [key: string]: ICalWeekday } = {
-                    'Mon': ICalWeekday.MO,
-                    'Tue': ICalWeekday.TU,
-                    'Wed': ICalWeekday.WE,
-                    'Thu': ICalWeekday.TH,
-                    'Fri': ICalWeekday.FR,
-                    'Sat': ICalWeekday.SA,
-                    'Sun': ICalWeekday.SU,
-                };
+                    const daysOfWeek: { [key: string]: ICalWeekday } = {
+                        'Mon': ICalWeekday.MO,
+                        'Tue': ICalWeekday.TU,
+                        'Wed': ICalWeekday.WE,
+                        'Thu': ICalWeekday.TH,
+                        'Fri': ICalWeekday.FR,
+                        'Sat': ICalWeekday.SA,
+                        'Sun': ICalWeekday.SU,
+                    };
 
-                const parseTime = (date: string, time: string) => {
-                    const [hour, minute, period] = time.match(/(\d+):(\d+) (a\.m\.|p\.m\.)/)!.slice(1);
-                    let hours = parseInt(hour, 10);
-                    if (period === 'p.m.' && hours !== 12) hours += 12;
-                    if (period === 'a.m.' && hours === 12) hours = 0;
-                    return new Date(`${date}T${hours.toString().padStart(2, '0')}:${minute}:00`);
-                };
+                    const parseTime = (date: string, time: string) => {
+                        const [hour, minute, period] = time.match(/(\d+):(\d+) (a\.m\.|p\.m\.)/)!.slice(1);
+                        let hours = parseInt(hour, 10);
+                        if (period === 'p.m.' && hours !== 12) hours += 12;
+                        if (period === 'a.m.' && hours === 12) hours = 0;
+                        return new Date(`${date}T${hours.toString().padStart(2, '0')}:${minute}:00`);
+                    };
 
-                const eventStart = parseTime(startDate, startTime);
-                const eventEnd = parseTime(startDate, endTime);
+                    const eventStart = parseTime(startDate, startTime);
+                    const eventEnd = parseTime(startDate, endTime);
 
-                const eventDays = days.split(' ').map(day => daysOfWeek[day]);
-                const eventTitle = section.split(' - ')[0];
+                    const eventDays = days.split(' ').map(day => daysOfWeek[day]);
+                    const eventTitle = section.split(' - ')[0];
 
-                calendar.createEvent({
-                    start: eventStart,
-                    end: eventEnd,
-                    repeating: {
-                        freq: ICalEventRepeatingFreq.WEEKLY,
-                        byDay: eventDays,
-                        until: new Date(`${endDate}T23:59:59`),
-                    },
-                    location: location,
-                    summary: eventTitle,
+                    calendar.createEvent({
+                        start: eventStart,
+                        end: eventEnd,
+                        repeating: {
+                            freq: ICalEventRepeatingFreq.WEEKLY,
+                            byDay: eventDays,
+                            until: new Date(`${endDate}T23:59:59`),
+                        },
+                        location: location,
+                        summary: eventTitle,
+                    });
                 });
-            });
 
-            const blob = new Blob([calendar.toString()], { type: 'text/calendar' });
-            saveAs(blob, 'schedule.ics');
-            setDone(true);
+                const blob = new Blob([calendar.toString()], { type: 'text/calendar' });
+                saveAs(blob, 'schedule.ics');
+                setDone(true);
+            } catch (e) {
+                alert('Sorry! Failed to convert file. Please verify the content of the file.');
+            }
         };
-
-        reader.readAsArrayBuffer(file);
+        try {
+            reader.readAsArrayBuffer(file);
+        } catch (e) {
+            alert('Sorry! Failed to read file. Please refresh the page and try again.');
+        }
     };
 
     return (
@@ -110,7 +117,6 @@ const FileUpload: React.FC = () => {
                     </p>
                 </>
             )}
-
         </div>
     );
 };
