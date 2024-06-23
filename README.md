@@ -1,5 +1,7 @@
 # UBC Workday Course Schedule Excel to iCal Converter
 
+Use it: https://workdaycal.vercel.app
+
 This is a simple Next.js application that allows users to upload an Excel file (.xlsx) containing schedule information and converts it to an iCal file compatible with Google or Apple Calendar.
 
 ## Features
