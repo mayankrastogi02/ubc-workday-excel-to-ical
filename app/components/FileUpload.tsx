@@ -17,7 +17,6 @@ const FileUpload: React.FC = () => {
 
     const handleFileUpload = async () => {
         if (!file) return;
-        console.log("HELLO");
         const workbook = new Excel.Workbook();
         const reader = new FileReader();
 
@@ -27,55 +26,59 @@ const FileUpload: React.FC = () => {
             await workbook.xlsx.load(buffer);
 
             const worksheet = workbook.worksheets[0];
-            console.log(worksheet);
             const rows = worksheet.getSheetValues().slice(4);  // Skip headers and start from the fourth row
             const calendar = ical({ name: 'Schedule' });
-            console.log(rows);
+
+            const daysOfWeek: { [key: string]: ICalWeekday } = {
+                'Mon': ICalWeekday.MO,
+                'Tue': ICalWeekday.TU,
+                'Wed': ICalWeekday.WE,
+                'Thu': ICalWeekday.TH,
+                'Fri': ICalWeekday.FR,
+                'Sat': ICalWeekday.SA,
+                'Sun': ICalWeekday.SU,
+            };
+
+            const parseTime = (date: string, time: string) => {
+                const [hour, minute, period] = time.match(/(\d+):(\d+) (a\.m\.|p\.m\.)/)!.slice(1);
+                let hours = parseInt(hour, 10);
+                if (period === 'p.m.' && hours !== 12) hours += 12;
+                if (period === 'a.m.' && hours === 12) hours = 0;
+                return new Date(`${date}T${hours.toString().padStart(2, '0')}:${minute}:00`);
+            };
+
             try {
                 rows.forEach((row: any) => {
-                    if (!row || row.length < 1) return;
+                    // The course could be an online course that doesn't have a schedule
+                    // In this case, we skip the course and move onto the next one
+                    if (!row || row.length < 1 || !row[8]) return;
                     const section: string = row[5];
-                    const schedule: string = row[8];
-                    console.log(schedule, section);
-                    const [dateRange, days, timeRange, location] = schedule.split(' | ');
-                    const [startDate, endDate] = dateRange.split(' - ');
-                    const [startTime, endTime] = timeRange.split(' - ');
+                    const schedules: string[] = row[8].split('\n');
 
-                    const daysOfWeek: { [key: string]: ICalWeekday } = {
-                        'Mon': ICalWeekday.MO,
-                        'Tue': ICalWeekday.TU,
-                        'Wed': ICalWeekday.WE,
-                        'Thu': ICalWeekday.TH,
-                        'Fri': ICalWeekday.FR,
-                        'Sat': ICalWeekday.SA,
-                        'Sun': ICalWeekday.SU,
-                    };
+                    schedules.forEach(schedule => {
+                        if (!schedule.trim()) return;
 
-                    const parseTime = (date: string, time: string) => {
-                        const [hour, minute, period] = time.match(/(\d+):(\d+) (a\.m\.|p\.m\.)/)!.slice(1);
-                        let hours = parseInt(hour, 10);
-                        if (period === 'p.m.' && hours !== 12) hours += 12;
-                        if (period === 'a.m.' && hours === 12) hours = 0;
-                        return new Date(`${date}T${hours.toString().padStart(2, '0')}:${minute}:00`);
-                    };
+                        const [dateRange, days, timeRange, location] = schedule.split(' | ');
+                        const [startDate, endDate] = dateRange.split(' - ');
+                        const [startTime, endTime] = timeRange.split(' - ');
 
-                    const eventStart = parseTime(startDate, startTime);
-                    const eventEnd = parseTime(startDate, endTime);
+                        const eventStart = parseTime(startDate, startTime);
+                        const eventEnd = parseTime(startDate, endTime);
 
-                    const eventDays = days.split(' ').map(day => daysOfWeek[day]);
-                    const eventTitle = section.split(' - ')[0];
+                        const eventDays = days.split(' ').map(day => daysOfWeek[day]);
+                        const eventTitle = section.split(' - ')[0];
 
-                    console.log(eventStart, eventEnd, eventDays, location, eventTitle);
-                    calendar.createEvent({
-                        start: eventStart,
-                        end: eventEnd,
-                        repeating: {
-                            freq: ICalEventRepeatingFreq.WEEKLY,
-                            byDay: eventDays,
-                            until: new Date(`${endDate}T23:59:59`),
-                        },
-                        location: location,
-                        summary: eventTitle,
+                        calendar.createEvent({
+                            start: eventStart,
+                            end: eventEnd,
+                            repeating: {
+                                freq: ICalEventRepeatingFreq.WEEKLY,
+                                byDay: eventDays,
+                                until: new Date(`${endDate}T23:59:59`),
+                            },
+                            location: location,
+                            summary: eventTitle,
+                        });
                     });
                 });
 
