@@ -47,6 +47,36 @@ const FileUpload: React.FC = () => {
                 return new Date(`${date}T${hours.toString().padStart(2, '0')}:${minute}:00`);
             };
 
+            const parseDate = (dateStr: string) => {
+                const [year, month, day] = dateStr.split('-').map(Number);
+                return new Date(Date.UTC(year, month - 1, day));
+            };
+
+            const getNextValidDate = (startDate: Date, targetDays: ICalWeekday[]) => {
+                const dayOfWeek = startDate.getDay();
+                let targetDayNumbers: (0 | 1 | 2 | 3 | 4 | 5 | 6)[] = [];
+                targetDayNumbers = targetDays.map(day => {
+                    switch (day) {
+                        case ICalWeekday.MO: return 1;
+                        case ICalWeekday.TU: return 2;
+                        case ICalWeekday.WE: return 3;
+                        case ICalWeekday.TH: return 4;
+                        case ICalWeekday.FR: return 5;
+                        case ICalWeekday.SA: return 6;
+                        case ICalWeekday.SU: return 0;
+                    }
+                });
+
+                for (let i = 0; i < 7; i++) {
+                    const nextDay = new Date(startDate);
+                    nextDay.setUTCDate(startDate.getUTCDate() + i);
+                    if (targetDayNumbers.includes(nextDay.getUTCDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6)) {
+                        return nextDay;
+                    }
+                }
+                return startDate;
+            };
+
             try {
                 rows.forEach((row: any) => {
                     // The course could be an online course that doesn't have a schedule
@@ -59,22 +89,25 @@ const FileUpload: React.FC = () => {
                         if (!schedule.trim()) return;
 
                         const [dateRange, days, timeRange, location] = schedule.split(' | ');
-                        const [startDate, endDate] = dateRange.split(' - ');
+                        const [startDateStr, endDateStr] = dateRange.split(' - ');
                         const [startTime, endTime] = timeRange.split(' - ');
 
-                        const eventStart = parseTime(startDate, startTime);
-                        const eventEnd = parseTime(startDate, endTime);
-
+                        const startDate = parseDate(startDateStr);
+                        const endDate = parseDate(endDateStr);
                         const eventDays = days.split(' ').map(day => daysOfWeek[day]);
                         const eventTitle = section.split(' - ')[0];
 
+                        const firstEventStartDate = getNextValidDate(startDate, eventDays);
+                        const eventStart = parseTime(firstEventStartDate.toISOString().split('T')[0], startTime);
+                        const eventEnd = parseTime(firstEventStartDate.toISOString().split('T')[0], endTime);
                         calendar.createEvent({
+                            timezone: 'America/Vancouver',
                             start: eventStart,
                             end: eventEnd,
                             repeating: {
                                 freq: ICalEventRepeatingFreq.WEEKLY,
                                 byDay: eventDays,
-                                until: new Date(`${endDate}T23:59:59`),
+                                until: new Date(`${endDateStr}T23:59:59`),
                             },
                             location: location,
                             summary: eventTitle,
