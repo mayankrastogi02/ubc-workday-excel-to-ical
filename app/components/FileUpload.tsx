@@ -27,6 +27,7 @@ const FileUpload: React.FC = () => {
 
             const worksheet = workbook.worksheets[0];
             const rows = worksheet.getSheetValues().slice(4);  // Skip headers and start from the fourth row
+
             const calendar = ical({ name: 'Schedule' });
 
             const daysOfWeek: { [key: string]: ICalWeekday } = {
@@ -78,12 +79,37 @@ const FileUpload: React.FC = () => {
             };
 
             try {
+                // values determining which columns to search for information
+                var sectionCol = -1;
+                var schedulesCol = -1;
+
+                // assign columns
+                const header = worksheet.getRow(3);
+                header.eachCell({ includeEmpty: true }, (cell, col) => {
+                    if (cell.value === "Section") {
+                        sectionCol = col;
+                    } else if (cell.value === "Meeting Patterns") {
+                        schedulesCol = col;
+                    }
+                })
+                
+                const foundSectionCol = sectionCol != -1;
+                const foundSchedulesCol = schedulesCol != -1;
+                if (!foundSectionCol || !foundSchedulesCol) {
+                    var err = "Could not find column(s) for: ";
+                    err += !foundSectionCol ? "Section" : "";
+                    err += (!foundSectionCol && !foundSchedulesCol) ? ", " : "";
+                    err += !foundSchedulesCol ? "Meeting Patterns" : "";
+                    throw new Error(err);
+                }
+
                 rows.forEach((row: any) => {
                     // The course could be an online course that doesn't have a schedule
                     // In this case, we skip the course and move onto the next one
-                    if (!row || row.length < 1 || !row[8]) return;
-                    const section: string = row[5];
-                    const schedules: string[] = row[8].split('\n');
+                    if (!row || row.length < 1 || !row[schedulesCol]) return;
+
+                    const section: string = row[sectionCol];
+                    const schedules: string[] = row[schedulesCol].split('\n');
 
                     schedules.forEach(schedule => {
                         if (!schedule.trim()) return;
