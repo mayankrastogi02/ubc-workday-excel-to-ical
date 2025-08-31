@@ -238,7 +238,8 @@ const FileUpload: React.FC = () => {
                             debugLog(`EVENT_SUCCESS: Row ${rowNumber}, Schedule ${scheduleIndex} created successfully`);
                             
                         } catch (scheduleError) {
-                            debugLog(`SCHEDULE_ERROR: Row ${rowNumber}, Schedule ${scheduleIndex} - ${scheduleError.message}`);
+                            const errorMessage = scheduleError instanceof Error ? scheduleError.message : 'Unknown error';
+                            debugLog(`SCHEDULE_ERROR: Row ${rowNumber}, Schedule ${scheduleIndex} - ${errorMessage}`);
                         }
                     });
                 });
@@ -251,8 +252,10 @@ const FileUpload: React.FC = () => {
                 debugLog('FILE_GENERATED: Calendar download initiated');
                 
             } catch (e) {
-                debugLog('FATAL_ERROR:', e.message);
-                debugLog('ERROR_STACK:', e.stack);
+                const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+                const errorStack = e instanceof Error ? e.stack : 'No stack trace available';
+                debugLog('FATAL_ERROR:', errorMessage);
+                debugLog('ERROR_STACK:', errorStack);
                 alert('Sorry! Failed to convert file. Please verify the content of the file.');
                 console.error(e);
             }
