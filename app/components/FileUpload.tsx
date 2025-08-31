@@ -50,8 +50,40 @@ const FileUpload: React.FC = () => {
             const allRows = worksheet.getSheetValues();
             debugLog('📝 Total rows in worksheet:', allRows.length);
             debugLog('🔍 First 3 rows (headers):', allRows.slice(0, 4));
+
+            // Thank you @spinningbanana for the dynamic header identification approach - u da best
+            // Find header row and column indices dynamically
+            let headerRowIndex = -1;
+            let sectionColumnIndex = -1;
+            let meetingPatternsColumnIndex = -1;
             
-            const rows = allRows.slice(4);  // Skip headers and start from the fourth row
+            // Look for the header row (usually row 3, but let's search dynamically)
+            for (let i = 0; i < Math.min(5, allRows.length); i++) {
+                const row = allRows[i];
+                if (row && Array.isArray(row)) {
+                    const sectionIndex = row.findIndex(cell => 
+                        typeof cell === 'string' && cell.toLowerCase().includes('section')
+                    );
+                    const meetingIndex = row.findIndex(cell => 
+                        typeof cell === 'string' && cell.toLowerCase().includes('meeting patterns')
+                    );
+                    
+                    if (sectionIndex !== -1 && meetingIndex !== -1) {
+                        headerRowIndex = i;
+                        sectionColumnIndex = sectionIndex;
+                        meetingPatternsColumnIndex = meetingIndex;
+                        debugLog('📍 Found headers in row', i + 1);
+                        debugLog('📋 Section column:', sectionColumnIndex, '- Meeting Patterns column:', meetingPatternsColumnIndex);
+                        break;
+                    }
+                }
+            }
+            
+            if (sectionColumnIndex === -1 || meetingPatternsColumnIndex === -1) {
+                throw new Error('Could not find required columns "Section" and "Meeting Patterns" in the spreadsheet headers');
+            }
+            
+            const rows = allRows.slice(headerRowIndex + 1);  // Skip to data rows after headers
             debugLog('📈 Data rows to process:', rows.length);
             
             const calendar = ical({ name: 'Schedule' });
@@ -131,7 +163,7 @@ const FileUpload: React.FC = () => {
                 let totalEvents = 0;
 
                 rows.forEach((row: any, index: number) => {
-                    const rowNumber = index + 5;
+                    const rowNumber = index + headerRowIndex + 2; // Adjust for header position
                     
                     // Critical checkpoint: Row structure analysis
                     if (!row || row.length < 1) {
@@ -141,16 +173,16 @@ const FileUpload: React.FC = () => {
                     }
                     
                     // Log row structure for debugging
-                    debugLog(`ROW_${rowNumber}: Length=${row.length}, Col8="${row[8]}", Col11="${row[11]}", Col7="${row[7]}"`);
+                    debugLog(`ROW_${rowNumber}: Length=${row.length}, Section="${row[sectionColumnIndex]}", MeetingPatterns="${row[meetingPatternsColumnIndex]}"`);
                     
-                    if (!row[11]) {
-                        debugLog(`SKIP_NO_SCHEDULE: Row ${rowNumber} - Column 11 empty. Available columns: ${Object.keys(row).join(',')}`);
+                    if (!row[meetingPatternsColumnIndex]) {
+                        debugLog(`SKIP_NO_SCHEDULE: Row ${rowNumber} - Meeting Patterns column empty. Available columns: ${Object.keys(row).join(',')}`);
                         skippedCourses++;
                         return;
                     }
 
-                    const section: string = row[7];
-                    const scheduleData = row[11];
+                    const section: string = row[sectionColumnIndex];
+                    const scheduleData = row[meetingPatternsColumnIndex];
                     const schedules: string[] = scheduleData.split('\n');
                     
                     debugLog(`PROCESS_ROW_${rowNumber}: Section="${section}", ScheduleRaw="${scheduleData}", SplitCount=${schedules.length}`);
